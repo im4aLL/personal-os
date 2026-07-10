@@ -125,3 +125,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Number input spinner buttons in dark mode */
+.dark input[type="number"]::-webkit-inner-spin-button,
+.dark input[type="number"]::-webkit-outer-spin-button {
+  filter: invert(1);
+}

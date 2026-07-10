@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#components/ui/select"
+import { DatePicker } from "#components/ui/date-picker"
 import type { Todo, TodoStatus } from "#lib/types/todo"
 
 const formSchema = z.object({
@@ -168,7 +169,12 @@ export function TodoDialog({ open, onOpenChange, todo, defaultStatus = "todo", o
                   <FormItem>
                     <FormLabel>Due date <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <DatePicker
+                        value={field.value || undefined}
+                        onChange={v => field.onChange(v ?? "")}
+                        placeholder="Pick a date"
+                        className="w-full"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

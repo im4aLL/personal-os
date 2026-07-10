@@ -16,12 +16,12 @@ import {
 } from "#components/ui/sidebar"
 
 const items = [
-  { title: "Dashboard",       to: "/dashboard", icon: Home          },
-  { title: "Save Links",     to: "/links",    icon: Link          },
-  { title: "Todo",           to: "/todo",     icon: ListTodo      },
-  { title: "Project Planner",to: "/projects", icon: FolderKanban  },
-  { title: "Work Log",       to: "/work-log", icon: ClipboardList },
-  { title: "Notes",          to: "/notes",    icon: NotebookPen   },
+  { title: "Dashboard",        to: "/dashboard", icon: Home          },
+  { title: "Todo",             to: "/todo",      icon: ListTodo      },
+  { title: "Save Links",      to: "/links",     icon: Link          },
+  { title: "Project Planner", to: "/projects",  icon: FolderKanban  },
+  { title: "Work Log",        to: "/work-log",  icon: ClipboardList },
+  { title: "Notes",           to: "/notes",     icon: NotebookPen   },
 ]
 
 export function AppSidebar() {

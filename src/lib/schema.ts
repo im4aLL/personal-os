@@ -39,4 +39,40 @@ export const REMOTE_SCHEMAS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_note_tags_note_id ON note_tags (note_id)`,
   `CREATE INDEX IF NOT EXISTS idx_note_tags_name    ON note_tags (name)`,
+  `CREATE TABLE IF NOT EXISTS links (
+    id          TEXT PRIMARY KEY,
+    url         TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    favicon_url TEXT,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    CONSTRAINT uq_links_url UNIQUE (url)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_links_created_at  ON links (created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS link_tags (
+    id         TEXT PRIMARY KEY,
+    link_id    TEXT NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_link_tags_link_id ON link_tags (link_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_link_tags_name    ON link_tags (name)`,
+  `CREATE TABLE IF NOT EXISTS work_logs (
+    id          TEXT PRIMARY KEY,
+    title       TEXT NOT NULL,
+    description TEXT,
+    start_date  TEXT NOT NULL,
+    end_date    TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_work_logs_start_date ON work_logs (start_date DESC)`,
+  `CREATE TABLE IF NOT EXISTS work_log_tags (
+    id          TEXT PRIMARY KEY,
+    work_log_id TEXT NOT NULL REFERENCES work_logs(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_work_log_tags_work_log_id ON work_log_tags (work_log_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_work_log_tags_name        ON work_log_tags (name)`,
 ]

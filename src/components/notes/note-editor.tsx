@@ -22,6 +22,8 @@ interface NoteEditorProps {
 export function NoteEditor({ noteId }: NoteEditorProps) {
   const { patchNoteInList, removeNote } = useNotesStore.getState()
 
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
   const [title,      setTitle]      = useState("")
   const [content,    setContent]    = useState("")
   const [tags,       setTags]       = useState<string[]>([])
@@ -67,6 +69,10 @@ export function NoteEditor({ noteId }: NoteEditorProps) {
       savedRef.current  = { title: note.title ?? "", content: note.content }
       latestRef.current = { title: note.title ?? "", content: note.content }
       setLoaded(true)
+      // Focus title for new notes, textarea for existing ones
+      requestAnimationFrame(() => {
+        titleInputRef.current?.focus()
+      })
     }).catch(console.error)
   }, [noteId])
 
@@ -164,6 +170,7 @@ export function NoteEditor({ noteId }: NoteEditorProps) {
       {/* Title + Tags */}
       <div className="px-5 pt-4 pb-2 shrink-0 space-y-2">
         <input
+          ref={titleInputRef}
           className="w-full bg-transparent text-xl font-semibold outline-none placeholder:text-muted-foreground/40"
           placeholder="Untitled"
           value={title}
@@ -188,7 +195,7 @@ export function NoteEditor({ noteId }: NoteEditorProps) {
             placeholder="Start writing in markdown…"
           />
         ) : (
-          <div className="h-full overflow-y-auto px-5 py-4 prose prose-sm dark:prose-invert max-w-none">
+          <div className="h-full overflow-y-auto px-5 py-4 prose prose-neutral dark:prose-invert max-w-none text-sm">
             {content.trim() ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
             ) : (

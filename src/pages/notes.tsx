@@ -17,7 +17,6 @@ function EmptyState() {
 
 export default function NotesPage() {
   const selectedId = useNotesStore(s => s.selectedId)
-
   return (
     <div className="flex h-full gap-0 -m-6">
       <NoteList />
