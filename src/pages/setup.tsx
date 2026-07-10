@@ -6,9 +6,10 @@ import { z } from "zod"
 import { DatabaseZap, HardDrive, Cloud, UserCircle } from "lucide-react"
 
 import { saveTursoConfig, clearTursoConfig, setAppMode } from "#lib/config"
-import { saveProfile } from "#lib/profile"
+import { saveProfile, getProfile } from "#lib/profile"
 import { tursoExecute, tursoSelect } from "#lib/turso"
 import { REMOTE_SCHEMAS } from "#lib/schema"
+import { syncTodos } from "#lib/sync"
 import { Button } from "#components/ui/button"
 import {
   Form,
@@ -41,8 +42,9 @@ type Step = "choose" | "cloud-form" | "profile"
 
 export default function SetupPage() {
   const navigate = useNavigate()
-  const [step, setStep]   = useState<Step>("choose")
-  const [error, setError] = useState<string | null>(null)
+  const [step, setStep]         = useState<Step>("choose")
+  const [prevStep, setPrevStep] = useState<Step>("choose")
+  const [error, setError]       = useState<string | null>(null)
 
   const cloudForm = useForm<CloudValues>({
     resolver: zodResolver(cloudSchema),
@@ -54,11 +56,11 @@ export default function SetupPage() {
     defaultValues: { name: "", email: "" },
   })
 
-  function goToProfile() { setStep("profile") }
+  function goToProfile(from: Step) { setPrevStep(from); setStep("profile") }
 
   function handleLocalOnly() {
     setAppMode("local")
-    goToProfile()
+    goToProfile("choose")
   }
 
   async function handleCloudSubmit(values: CloudValues) {
@@ -70,7 +72,14 @@ export default function SetupPage() {
       await tursoSelect("SELECT 1")
       for (const sql of REMOTE_SCHEMAS) await tursoExecute(sql)
       setAppMode("cloud")
-      goToProfile()
+      // Pull existing data (profile, todos) from cloud before deciding next step
+      await syncTodos()
+      const existing = await getProfile()
+      if (existing) {
+        navigate("/dashboard", { replace: true })
+      } else {
+        goToProfile("cloud-form")
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not connect. Check your URL and token.")
     }
@@ -228,9 +237,19 @@ export default function SetupPage() {
                 </a>{" "}
                 avatar. It is stored only on this device.
               </p>
-              <Button type="submit" className="w-full">
-                Get started
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setStep(prevStep)}
+                >
+                  Back
+                </Button>
+                <Button type="submit" className="flex-1">
+                  Get started
+                </Button>
+              </div>
             </form>
           </Form>
         )}

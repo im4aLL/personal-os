@@ -45,7 +45,7 @@ export function KanbanBoard() {
   useEffect(() => { loadTodos() }, [])
 
   useEffect(() => {
-    const handler = () => loadTodos()
+    const handler = () => refreshTodos()
     window.addEventListener("personal-os:sync-complete", handler)
     return () => window.removeEventListener("personal-os:sync-complete", handler)
   }, [])
@@ -58,6 +58,15 @@ export function KanbanBoard() {
       console.error("Failed to load todos:", err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Silent refresh — used after sync so no skeleton flash
+  async function refreshTodos() {
+    try {
+      setTodos(await getTodos())
+    } catch (err) {
+      console.error("Failed to refresh todos:", err)
     }
   }
 

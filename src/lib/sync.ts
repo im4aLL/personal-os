@@ -52,7 +52,7 @@ async function syncAppSettings() {
   }
 }
 
-export async function syncTodos(): Promise<void> {
+export async function syncTodos(options: { silent?: boolean } = {}): Promise<void> {
   await ensureRemoteSchema()
   await syncAppSettings()
 
@@ -107,5 +107,7 @@ export async function syncTodos(): Promise<void> {
     }
   }
 
-  window.dispatchEvent(new CustomEvent("personal-os:sync-complete"))
+  if (!options.silent) {
+    window.dispatchEvent(new CustomEvent("personal-os:sync-complete"))
+  }
 }

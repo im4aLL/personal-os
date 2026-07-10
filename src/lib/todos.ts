@@ -7,7 +7,8 @@ import { randomUUID } from "#lib/uuid"
 
 function backgroundSync() {
   if (getAppMode() !== "cloud") return
-  syncTodos().catch((err) => console.warn("Background sync failed:", err))
+  // silent: true — don't dispatch sync-complete, UI state is already correct
+  syncTodos({ silent: true }).catch(err => console.warn("Background sync failed:", err))
 }
 
 export async function getTodos(): Promise<Todo[]> {

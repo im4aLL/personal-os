@@ -100,6 +100,33 @@ shadcn aliases (in components.json) map: `ui` -> `#components/ui`,
   `tauri.conf.json` (`devUrl`).
 - Do not edit generated files under `src-tauri/gen/` or `src-tauri/target/`.
 
+## Sync Rules
+
+This app has two sync modes driven by `getAppMode()` from `#lib/config`:
+- **`local`** — SQLite only (`personal-os-local.db`), no cloud, no sync calls
+- **`cloud`** — SQLite (`personal-os-cloud.db`) + Turso HTTP sync
+
+### syncTodos(options?)
+`syncTodos()` in `#lib/sync` is the single sync entry point. It syncs both `todos`
+and `app_settings` tables bidirectionally (last-write-wins via `updated_at`).
+
+| Caller | How to call | Why |
+|--------|-------------|-----|
+| After a write (create/update/delete) | `syncTodos({ silent: true })` | UI state already correct — push only, no UI refresh |
+| App startup (`Layout.tsx`) | `syncTodos()` | Pull remote changes into UI on open |
+| Manual sync button / cloud sync icon | `syncTodos()` | User-initiated, refresh UI with remote changes |
+
+**Never** call `syncTodos()` (without `silent: true`) after local writes — it dispatches
+`personal-os:sync-complete` which triggers `refreshTodos()` in `KanbanBoard`, causing
+visible flicker. Background syncs must always use `{ silent: true }`.
+
+### Adding a new synced table
+1. Add migration SQL to `src-tauri/migrations/00N_table.sql`
+2. Register in `lib.rs` for both `personal-os-local.db` and `personal-os-cloud.db`
+3. Add `CREATE TABLE IF NOT EXISTS ...` to `REMOTE_SCHEMAS` in `#lib/schema`
+4. Add a `syncTableName()` function in `#lib/sync` following the todos/app_settings pattern
+5. Call it inside `syncTodos()`
+
 ## When Adding Features
 
 1. Frontend UI -> `src/components/`, using `#`-prefixed imports and `cn()`.

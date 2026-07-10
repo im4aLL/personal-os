@@ -48,7 +48,7 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
   if (getAppMode() === "cloud") {
     // Lazy import to avoid circular dependency (sync → profile → sync)
     const { syncTodos } = await import("#lib/sync")
-    syncTodos().catch(err => console.warn("Profile sync failed:", err))
+    syncTodos({ silent: true }).catch(err => console.warn("Profile sync failed:", err))
   }
 }
 
