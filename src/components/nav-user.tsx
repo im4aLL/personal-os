@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router"
-import { ChevronsUpDown, RefreshCw, Unplug } from "lucide-react"
+import { ChevronsUpDown, RefreshCw, Unplug, Download, Upload } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "#components/ui/avatar"
 import {
@@ -17,9 +17,11 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "#components/ui/sidebar"
-import { clearTursoConfig } from "#lib/config"
+import { clearAll, getAppMode } from "#lib/config"
 import { syncTodos } from "#lib/sync"
+import { exportDb, importDb } from "#lib/db"
 import { cn } from "#lib/utils"
+import { save, open } from "@tauri-apps/plugin-dialog"
 
 interface NavUserProps {
   user: {
@@ -32,7 +34,10 @@ interface NavUserProps {
 export function NavUser({ user }: NavUserProps) {
   const { isMobile } = useSidebar()
   const navigate = useNavigate()
-  const [syncLabel,  setSyncLabel]  = useState("Sync Now")
+  const mode = getAppMode()
+  const isCloud = mode === "cloud"
+
+  const [syncLabel,  setSyncLabel]  = useState("Sync")
   const [syncing,    setSyncing]    = useState(false)
   const [syncStatus, setSyncStatus] = useState<"idle" | "done" | "error">("idle")
 
@@ -54,8 +59,27 @@ export function NavUser({ user }: NavUserProps) {
     }
   }
 
+  async function handleExport() {
+    const dest = await save({
+      defaultPath: "personal-os-backup.db",
+      filters: [{ name: "SQLite Database", extensions: ["db"] }],
+    })
+    if (!dest) return
+    await exportDb(dest)
+  }
+
+  async function handleImport() {
+    const src = await open({
+      multiple: false,
+      filters: [{ name: "SQLite Database", extensions: ["db"] }],
+    })
+    if (!src) return
+    await importDb(src as string)
+    window.location.reload()
+  }
+
   function handleDisconnect() {
-    clearTursoConfig()
+    clearAll()
     navigate("/setup", { replace: true })
   }
 
@@ -106,27 +130,42 @@ export function NavUser({ user }: NavUserProps) {
 
             <DropdownMenuSeparator />
 
-            {/* Sync */}
-            <DropdownMenuItem
-              onClick={handleSync}
-              className={cn(
-                syncStatus === "done"  && "text-green-500 focus:text-green-500",
-                syncStatus === "error" && "text-destructive focus:text-destructive",
-              )}
-            >
-              <RefreshCw className={cn("size-4", syncing && "animate-spin")} />
-              {syncLabel}
-            </DropdownMenuItem>
+            {/* Cloud mode: Sync */}
+            {isCloud && (
+              <DropdownMenuItem
+                onClick={handleSync}
+                className={cn(
+                  syncStatus === "done"  && "text-green-500 focus:text-green-500",
+                  syncStatus === "error" && "text-destructive focus:text-destructive",
+                )}
+              >
+                <RefreshCw className={cn("size-4", syncing && "animate-spin")} />
+                {syncLabel}
+              </DropdownMenuItem>
+            )}
+
+            {/* Local mode: Export / Import */}
+            {!isCloud && (
+              <>
+                <DropdownMenuItem onClick={handleExport}>
+                  <Download />
+                  Export database
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleImport}>
+                  <Upload />
+                  Import database
+                </DropdownMenuItem>
+              </>
+            )}
 
             <DropdownMenuSeparator />
 
-            {/* Disconnect */}
             <DropdownMenuItem
               onClick={handleDisconnect}
               className="text-destructive focus:text-destructive"
             >
               <Unplug />
-              Disconnect database
+              {isCloud ? "Disconnect database" : "Reset & change mode"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

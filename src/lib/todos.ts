@@ -1,10 +1,11 @@
 import { getDb } from "#lib/db"
 import { syncTodos } from "#lib/sync"
+import { getAppMode } from "#lib/config"
 import type { Todo, CreateTodoInput, UpdateTodoInput } from "#lib/types/todo"
 import { randomUUID } from "#lib/uuid"
 
-// Fire-and-forget sync after each write so other machines get changes quickly
 function backgroundSync() {
+  if (getAppMode() !== "cloud") return
   syncTodos().catch((err) => console.warn("Background sync failed:", err))
 }
 
