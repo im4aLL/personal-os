@@ -8,6 +8,8 @@ import {
   BreadcrumbPage,
 } from "#components/ui/breadcrumb"
 import { ThemeToggle } from "#components/theme-toggle"
+import { CloudSyncButton } from "#components/cloud-sync-button"
+import { getAppMode } from "#lib/config"
 
 const titles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -36,7 +38,8 @@ export function AppHeader() {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <div className="ml-auto px-4">
+      <div className="ml-auto flex items-center gap-1 px-4">
+        {getAppMode() === "cloud" && <CloudSyncButton />}
         <ThemeToggle />
       </div>
     </header>
