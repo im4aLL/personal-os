@@ -41,6 +41,7 @@ pub fn run() {
     let migrations = || vec![
         migration(1, "create_todos_table",        include_str!("../migrations/001_todos.sql")),
         migration(2, "create_app_settings_table", include_str!("../migrations/002_app_settings.sql")),
+        migration(3, "create_notes_tables",        include_str!("../migrations/003_notes.sql")),
     ];
 
     tauri::Builder::default()

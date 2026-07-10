@@ -2,6 +2,9 @@ import { getDb } from "#lib/db"
 import { tursoExecute, tursoSelect } from "#lib/turso"
 import { REMOTE_SCHEMAS } from "#lib/schema"
 import type { Todo } from "#lib/types/todo"
+import type { Note, NoteTag } from "#lib/types/note"
+import { useTodosStore } from "#store/todos"
+import { useNotesStore } from "#store/notes"
 
 async function ensureRemoteSchema() {
   for (const sql of REMOTE_SCHEMAS) {
@@ -107,7 +110,85 @@ export async function syncTodos(options: { silent?: boolean } = {}): Promise<voi
     }
   }
 
+  await syncNotes()
+
   if (!options.silent) {
-    window.dispatchEvent(new CustomEvent("personal-os:sync-complete"))
+    useTodosStore.getState().refreshTodos()
+    useNotesStore.getState().refreshNotes()
+  }
+}
+
+async function syncNotes(): Promise<void> {
+  const db = await getDb()
+
+  const [remoteNotes, localNotes] = await Promise.all([
+    tursoSelect<Note>("SELECT * FROM notes"),
+    db.select<Note[]>("SELECT * FROM notes"),
+  ])
+
+  const remoteMap = new Map(remoteNotes.map(n => [n.id, n]))
+  const localMap  = new Map(localNotes.map(n => [n.id, n]))
+
+  // Pull: remote → local
+  for (const remote of remoteNotes) {
+    const local = localMap.get(remote.id)
+    if (!local) {
+      await db.execute(
+        `INSERT OR IGNORE INTO notes (id,title,content,created_at,updated_at)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [remote.id, remote.title, remote.content, remote.created_at, remote.updated_at]
+      )
+    } else if (remote.updated_at > local.updated_at) {
+      await db.execute(
+        "UPDATE notes SET title=$1,content=$2,updated_at=$3 WHERE id=$4",
+        [remote.title, remote.content, remote.updated_at, remote.id]
+      )
+    }
+  }
+
+  // Push: local → remote
+  for (const local of localNotes) {
+    const remote = remoteMap.get(local.id)
+    if (!remote) {
+      await tursoExecute(
+        `INSERT OR IGNORE INTO notes (id,title,content,created_at,updated_at)
+         VALUES (?,?,?,?,?)`,
+        [local.id, local.title, local.content, local.created_at, local.updated_at]
+      )
+    } else if (local.updated_at > remote.updated_at) {
+      await tursoExecute(
+        "UPDATE notes SET title=?,content=?,updated_at=? WHERE id=?",
+        [local.title, local.content, local.updated_at, local.id]
+      )
+    }
+  }
+
+  // Sync note_tags (INSERT OR IGNORE both ways — no updated_at, no tombstones)
+  const [remoteTags, localTags] = await Promise.all([
+    tursoSelect<NoteTag>("SELECT * FROM note_tags"),
+    db.select<NoteTag[]>("SELECT * FROM note_tags"),
+  ])
+
+  const remoteTagIds = new Set(remoteTags.map(t => t.id))
+  const localTagIds  = new Set(localTags.map(t => t.id))
+
+  // Pull tags that exist remotely but not locally (only for notes we have)
+  for (const tag of remoteTags) {
+    if (!localTagIds.has(tag.id) && localMap.has(tag.note_id)) {
+      await db.execute(
+        "INSERT OR IGNORE INTO note_tags (id,note_id,name,created_at) VALUES ($1,$2,$3,$4)",
+        [tag.id, tag.note_id, tag.name, tag.created_at]
+      )
+    }
+  }
+
+  // Push tags that exist locally but not remotely (only for notes we pushed)
+  for (const tag of localTags) {
+    if (!remoteTagIds.has(tag.id) && remoteMap.has(tag.note_id)) {
+      await tursoExecute(
+        "INSERT OR IGNORE INTO note_tags (id,note_id,name,created_at) VALUES (?,?,?,?)",
+        [tag.id, tag.note_id, tag.name, tag.created_at]
+      )
+    }
   }
 }

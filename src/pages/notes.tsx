@@ -1,7 +1,7 @@
-import { useState } from "react"
+import { FileText } from "lucide-react"
 import { NoteList } from "#components/notes/note-list"
 import { NoteEditor } from "#components/notes/note-editor"
-import { FileText } from "lucide-react"
+import { useNotesStore } from "#store/notes"
 
 function EmptyState() {
   return (
@@ -16,11 +16,11 @@ function EmptyState() {
 }
 
 export default function NotesPage() {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selectedId = useNotesStore(s => s.selectedId)
 
   return (
     <div className="flex h-full gap-0 -m-6">
-      <NoteList selectedId={selectedId} onSelect={setSelectedId} />
+      <NoteList />
       <div className="flex-1 min-w-0">
         {selectedId ? <NoteEditor noteId={selectedId} /> : <EmptyState />}
       </div>

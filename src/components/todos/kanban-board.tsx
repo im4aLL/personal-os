@@ -15,13 +15,9 @@ import { Search } from "lucide-react"
 import { Input } from "#components/ui/input"
 import { Skeleton } from "#components/ui/skeleton"
 import { cn } from "#lib/utils"
-import {
-  getTodos,
-  createTodo,
-  updateTodo,
-  deleteTodo,
-} from "#lib/todos"
+import { createTodo, updateTodo, deleteTodo } from "#lib/todos"
 import type { Todo, TodoStatus } from "#lib/types/todo"
+import { useTodosStore } from "#store/todos"
 import { KanbanColumn } from "./kanban-column"
 import { TodoCard } from "./todo-card"
 import { TodoDialog, type TodoFormValues } from "./todo-dialog"
@@ -29,12 +25,14 @@ import { TodoDialog, type TodoFormValues } from "./todo-dialog"
 const COLUMNS: TodoStatus[] = ["todo", "in_progress", "completed"]
 
 export function KanbanBoard() {
-  const [todos, setTodos]               = useState<Todo[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [search, setSearch]             = useState("")
-  const [activeId, setActiveId]         = useState<string | null>(null)
-  const [dialogOpen, setDialogOpen]     = useState(false)
-  const [editingTodo, setEditingTodo]   = useState<Todo | null>(null)
+  const todos   = useTodosStore(s => s.todos)
+  const loading = useTodosStore(s => s.loading)
+  const { loadTodos, addTodo, patchTodo, removeTodo } = useTodosStore.getState()
+
+  const [search,        setSearch]        = useState("")
+  const [activeId,      setActiveId]      = useState<string | null>(null)
+  const [dialogOpen,    setDialogOpen]    = useState(false)
+  const [editingTodo,   setEditingTodo]   = useState<Todo | null>(null)
   const [defaultStatus, setDefaultStatus] = useState<TodoStatus>("todo")
 
   const sensors = useSensors(
@@ -42,56 +40,28 @@ export function KanbanBoard() {
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
   )
 
-  useEffect(() => { loadTodos() }, [])
-
-  useEffect(() => {
-    const handler = () => refreshTodos()
-    window.addEventListener("personal-os:sync-complete", handler)
-    return () => window.removeEventListener("personal-os:sync-complete", handler)
-  }, [])
-
-  async function loadTodos() {
-    try {
-      setLoading(true)
-      setTodos(await getTodos())
-    } catch (err) {
-      console.error("Failed to load todos:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Silent refresh — used after sync so no skeleton flash
-  async function refreshTodos() {
-    try {
-      setTodos(await getTodos())
-    } catch (err) {
-      console.error("Failed to refresh todos:", err)
-    }
-  }
+  useEffect(() => { loadTodos() }, [loadTodos])
 
   // Client-side search filter
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return todos
-    return todos.filter(
-      (t) =>
-        t.title.toLowerCase().includes(q) ||
-        t.description?.toLowerCase().includes(q)
+    return todos.filter(t =>
+      t.title.toLowerCase().includes(q) ||
+      t.description?.toLowerCase().includes(q)
     )
   }, [todos, search])
 
   // Group by status
   const byStatus = useMemo(
-    () =>
-      COLUMNS.reduce(
-        (acc, s) => ({ ...acc, [s]: filtered.filter((t) => t.status === s) }),
-        {} as Record<TodoStatus, Todo[]>
-      ),
+    () => COLUMNS.reduce(
+      (acc, s) => ({ ...acc, [s]: filtered.filter(t => t.status === s) }),
+      {} as Record<TodoStatus, Todo[]>
+    ),
     [filtered]
   )
 
-  const activeTodo = todos.find((t) => t.id === activeId)
+  const activeTodo = todos.find(t => t.id === activeId)
 
   // ── DnD handlers ────────────────────────────────────────────────
   function handleDragStart({ active }: DragStartEvent) {
@@ -102,25 +72,23 @@ export function KanbanBoard() {
     setActiveId(null)
     if (!over) return
 
-    const activeId  = active.id as string
-    const overId    = over.id as string
-    const activeTodo = todos.find((t) => t.id === activeId)
+    const id         = active.id as string
+    const overId     = over.id as string
+    const activeTodo = todos.find(t => t.id === id)
     if (!activeTodo) return
 
     const targetStatus = COLUMNS.includes(overId as TodoStatus)
       ? (overId as TodoStatus)
-      : todos.find((t) => t.id === overId)?.status ?? activeTodo.status
+      : todos.find(t => t.id === overId)?.status ?? activeTodo.status
 
     if (targetStatus === activeTodo.status) return
 
-    setTodos((prev) =>
-      prev.map((t) => (t.id === activeId ? { ...t, status: targetStatus } : t))
-    )
+    patchTodo(id, { status: targetStatus })
     try {
-      await updateTodo(activeId, { status: targetStatus })
+      await updateTodo(id, { status: targetStatus })
     } catch (err) {
       console.error("Failed to update todo:", err)
-      await loadTodos() // revert on failure
+      loadTodos() // revert on failure
     }
   }
 
@@ -141,17 +109,15 @@ export function KanbanBoard() {
     const due_date = values.due_date?.trim() || null
 
     if (editingTodo) {
-      const updated = {
+      const patch = {
         title:       values.title,
         description: values.description?.trim() || null,
         priority,
         due_date,
         status:      values.status,
       }
-      await updateTodo(editingTodo.id, updated)
-      setTodos((prev) =>
-        prev.map((t) => (t.id === editingTodo.id ? { ...t, ...updated } : t))
-      )
+      await updateTodo(editingTodo.id, patch)
+      patchTodo(editingTodo.id, patch)
     } else {
       const created = await createTodo({
         title:       values.title,
@@ -161,17 +127,17 @@ export function KanbanBoard() {
         status:      values.status ?? defaultStatus,
         position:    byStatus[defaultStatus].length,
       })
-      setTodos((prev) => [...prev, created])
+      addTodo(created)
     }
   }
 
   async function handleDelete(id: string) {
-    setTodos((prev) => prev.filter((t) => t.id !== id))
+    removeTodo(id)
     try {
       await deleteTodo(id)
     } catch (err) {
       console.error("Failed to delete todo:", err)
-      await loadTodos()
+      loadTodos() // revert on failure
     }
   }
 
@@ -179,7 +145,7 @@ export function KanbanBoard() {
   if (loading) {
     return (
       <div className="flex gap-4 h-full">
-        {COLUMNS.map((s) => (
+        {COLUMNS.map(s => (
           <div key={s} className="flex-1 space-y-2">
             <Skeleton className="h-6 w-28" />
             <Skeleton className="h-24 w-full rounded-xl" />
@@ -199,7 +165,7 @@ export function KanbanBoard() {
           className="pl-8 h-8 text-sm"
           placeholder="Search todos..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={e => setSearch(e.target.value)}
         />
       </div>
 
@@ -212,7 +178,7 @@ export function KanbanBoard() {
         onDragCancel={() => setActiveId(null)}
       >
         <div className="flex gap-4 flex-1 overflow-x-auto pb-2">
-          {COLUMNS.map((status) => (
+          {COLUMNS.map(status => (
             <KanbanColumn
               key={status}
               status={status}

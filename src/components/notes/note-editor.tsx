@@ -1,43 +1,123 @@
-import { useState } from "react"
-import { Eye, Pencil, Trash2, Check } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Eye, Pencil, Trash2, Check, Loader2 } from "lucide-react"
+import { useDebounce } from "use-debounce"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { Button } from "#components/ui/button"
 import { Separator } from "#components/ui/separator"
 import { Textarea } from "#components/ui/textarea"
 import { NoteTagInput } from "./note-tag-input"
+import { getNoteById, updateNote, deleteNote } from "#lib/notes"
+import { useNotesStore } from "#store/notes"
+import type { NoteWithTags } from "#lib/types/note"
 import { cn } from "#lib/utils"
 
-const MOCK_CONTENT = `## Project Brainstorm
-
-Some initial thoughts on the new feature set for Q3.
-
-### Ideas
-
-- **Sync indicator** in the header showing last synced time
-- Tag filtering in the notes list
-- Keyboard shortcuts for common actions
-
-### Open questions
-
-1. Should tags be global or per-note only?
-2. Do we need folder support before launch?
-
-> Keep it simple — ship the core and iterate.
-`
-
-type Mode = "edit" | "preview"
+type Mode       = "edit" | "preview"
+type SaveStatus = "idle" | "saving" | "saved"
 
 interface NoteEditorProps {
   noteId: string
 }
 
-export function NoteEditor({ noteId: _noteId }: NoteEditorProps) {
-  const [mode, setMode] = useState<Mode>("edit")
+export function NoteEditor({ noteId }: NoteEditorProps) {
+  const { patchNoteInList, removeNote } = useNotesStore.getState()
+
+  const [title,      setTitle]      = useState("")
+  const [content,    setContent]    = useState("")
+  const [tags,       setTags]       = useState<string[]>([])
+  const [mode,       setMode]       = useState<Mode>("edit")
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle")
+  const [loaded,     setLoaded]     = useState(false)
+
+  const [debouncedTitle]   = useDebounce(title,   1000)
+  const [debouncedContent] = useDebounce(content, 1000)
+
+  // Track last-saved values to avoid redundant writes
+  const savedRef  = useRef({ title: "", content: "" })
+  // Track latest values for flush-on-note-change
+  const latestRef = useRef({ title: "", content: "" })
+  const noteIdRef = useRef(noteId)
+
+  useEffect(() => {
+    const prevId = noteIdRef.current
+    const prev   = latestRef.current
+    const saved  = savedRef.current
+
+    if (prevId && (prev.title !== saved.title || prev.content !== saved.content)) {
+      updateNote(prevId, {
+        title:   prev.title.trim() || null,
+        content: prev.content,
+      }).catch(console.error)
+    }
+
+    noteIdRef.current = noteId
+    setLoaded(false)
+    setSaveStatus("idle")
+    // Clear stale content immediately so the previous note's data
+    // never shows while the new note is loading.
+    setTitle("")
+    setContent("")
+    setTags([])
+
+    getNoteById(noteId).then((note: NoteWithTags | null) => {
+      if (!note) return
+      setTitle(note.title ?? "")
+      setContent(note.content)
+      setTags(note.tags)
+      savedRef.current  = { title: note.title ?? "", content: note.content }
+      latestRef.current = { title: note.title ?? "", content: note.content }
+      setLoaded(true)
+    }).catch(console.error)
+  }, [noteId])
+
+  // Auto-save when debounced values settle
+  useEffect(() => {
+    if (!loaded) return
+    // Guard: if debounced values haven't caught up with the current note's
+    // actual content yet, they're still carrying the previous note's data.
+    // Skip until the debounce reflects what the user is actually looking at.
+    if (debouncedTitle !== latestRef.current.title || debouncedContent !== latestRef.current.content) return
+    const s = savedRef.current
+    if (debouncedTitle === s.title && debouncedContent === s.content) return
+
+    setSaveStatus("saving")
+    savedRef.current = { title: debouncedTitle, content: debouncedContent }
+
+    const now = new Date().toISOString()
+    updateNote(noteId, {
+      title:   debouncedTitle.trim() || null,
+      content: debouncedContent,
+    }).then(() => {
+      // Update the list in the store so title + date reflect immediately
+      patchNoteInList(noteId, {
+        title:      debouncedTitle.trim() || null,
+        updated_at: now,
+      })
+      setSaveStatus("saved")
+      setTimeout(() => setSaveStatus("idle"), 2000)
+    }).catch(console.error)
+  }, [debouncedTitle, debouncedContent, loaded, noteId, patchNoteInList])
+
+  function handleTitleChange(v: string) {
+    setTitle(v)
+    latestRef.current.title = v
+  }
+
+  function handleContentChange(v: string) {
+    setContent(v)
+    latestRef.current.content = v
+  }
+
+  async function handleDelete() {
+    await deleteNote(noteId)
+    removeNote(noteId)
+  }
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
+      {/* Toolbar */}
       <div className="flex items-center justify-between px-5 py-3 border-b shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button
             variant={mode === "edit" ? "secondary" : "ghost"}
             size="xs"
@@ -57,15 +137,25 @@ export function NoteEditor({ noteId: _noteId }: NoteEditorProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Saved indicator */}
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Check className="size-3" />
-            Saved
-          </span>
-
+          {saveStatus === "saving" && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              Saving…
+            </span>
+          )}
+          {saveStatus === "saved" && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Check className="size-3" />
+              Saved
+            </span>
+          )}
           <Separator orientation="vertical" className="h-4" />
-
-          <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={handleDelete}
+          >
             <Trash2 className="size-4" />
           </Button>
         </div>
@@ -74,15 +164,12 @@ export function NoteEditor({ noteId: _noteId }: NoteEditorProps) {
       {/* Title + Tags */}
       <div className="px-5 pt-4 pb-2 shrink-0 space-y-2">
         <input
-          className={cn(
-            "w-full bg-transparent text-xl font-semibold outline-none",
-            "placeholder:text-muted-foreground/40"
-          )}
+          className="w-full bg-transparent text-xl font-semibold outline-none placeholder:text-muted-foreground/40"
           placeholder="Untitled"
-          defaultValue="Project brainstorm"
-          readOnly
+          value={title}
+          onChange={e => handleTitleChange(e.target.value)}
         />
-        <NoteTagInput />
+        <NoteTagInput noteId={noteId} tags={tags} onChange={setTags} />
       </div>
 
       <Separator />
@@ -96,31 +183,17 @@ export function NoteEditor({ noteId: _noteId }: NoteEditorProps) {
               "px-5 py-4 text-sm font-mono leading-relaxed",
               "focus-visible:ring-0"
             )}
-            defaultValue={MOCK_CONTENT}
-            readOnly
+            value={content}
+            onChange={e => handleContentChange(e.target.value)}
+            placeholder="Start writing in markdown…"
           />
         ) : (
-          <div
-            className={cn(
-              "h-full overflow-y-auto px-5 py-4",
-              "prose prose-sm dark:prose-invert max-w-none",
+          <div className="h-full overflow-y-auto px-5 py-4 prose prose-sm dark:prose-invert max-w-none">
+            {content.trim() ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            ) : (
+              <p className="text-muted-foreground italic text-sm">Nothing to preview yet.</p>
             )}
-          >
-            {/* Static preview — real render will use react-markdown */}
-            <h2>Project Brainstorm</h2>
-            <p>Some initial thoughts on the new feature set for Q3.</p>
-            <h3>Ideas</h3>
-            <ul>
-              <li><strong>Sync indicator</strong> in the header showing last synced time</li>
-              <li>Tag filtering in the notes list</li>
-              <li>Keyboard shortcuts for common actions</li>
-            </ul>
-            <h3>Open questions</h3>
-            <ol>
-              <li>Should tags be global or per-note only?</li>
-              <li>Do we need folder support before launch?</li>
-            </ol>
-            <blockquote>Keep it simple — ship the core and iterate.</blockquote>
           </div>
         )}
       </div>
