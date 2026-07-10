@@ -5,14 +5,23 @@ import type { Todo } from "#lib/types/todo"
 import type { Note, NoteTag } from "#lib/types/note"
 import type { Link, LinkTag } from "#lib/types/link"
 import type { WorkLog, WorkLogTag } from "#lib/types/work-log"
+import type { Project, ProjectPhase, WorkItem } from "#lib/types/project"
 import { useTodosStore } from "#store/todos"
 import { useNotesStore } from "#store/notes"
 import { useLinksStore } from "#store/links"
 import { useWorkLogsStore } from "#store/work-logs"
+import { useProjectsStore } from "#store/projects"
 
 async function ensureRemoteSchema() {
   for (const sql of REMOTE_SCHEMAS) {
-    await tursoExecute(sql)
+    try {
+      await tursoExecute(sql)
+    } catch (err) {
+      // ALTER TABLE ADD COLUMN throws if the column already exists — ignore that
+      // so re-running sync stays safe. Re-throw anything else.
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
+      if (!msg.includes("duplicate column")) throw err
+    }
   }
 }
 
@@ -117,12 +126,14 @@ export async function syncTodos(options: { silent?: boolean } = {}): Promise<voi
   await syncNotes()
   await syncLinks()
   await syncWorkLogs()
+  await syncProjects()
 
   if (!options.silent) {
     useTodosStore.getState().refreshTodos()
     useNotesStore.getState().refreshNotes()
     useLinksStore.getState().refreshLinks()
     useWorkLogsStore.getState().refreshWorkLogs()
+    useProjectsStore.getState().refreshProjects()
   }
 }
 
@@ -339,6 +350,113 @@ async function syncWorkLogs(): Promise<void> {
       await tursoExecute(
         "INSERT OR IGNORE INTO work_log_tags (id,work_log_id,name,created_at) VALUES (?,?,?,?)",
         [tag.id, tag.work_log_id, tag.name, tag.created_at]
+      )
+    }
+  }
+}
+
+async function syncProjects(): Promise<void> {
+  const db = await getDb()
+
+  // ── projects ───────────────────────────────────────────────────────────────
+  const [remoteProjects, localProjects] = await Promise.all([
+    tursoSelect<Project>("SELECT * FROM projects"),
+    db.select<Project[]>("SELECT * FROM projects"),
+  ])
+  const remoteProjectMap = new Map(remoteProjects.map(p => [p.id, p]))
+  const localProjectMap  = new Map(localProjects.map(p => [p.id, p]))
+
+  for (const r of remoteProjects) {
+    const l = localProjectMap.get(r.id)
+    if (!l) {
+      await db.execute(
+        "INSERT OR IGNORE INTO projects (id,name,start_date,week_count,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6)",
+        [r.id, r.name, r.start_date, r.week_count, r.created_at, r.updated_at]
+      )
+    } else if (r.updated_at > l.updated_at) {
+      await db.execute(
+        "UPDATE projects SET name=$1,start_date=$2,week_count=$3,updated_at=$4 WHERE id=$5",
+        [r.name, r.start_date, r.week_count, r.updated_at, r.id]
+      )
+    }
+  }
+  for (const l of localProjects) {
+    const r = remoteProjectMap.get(l.id)
+    if (!r) {
+      await tursoExecute(
+        "INSERT OR IGNORE INTO projects (id,name,start_date,week_count,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+        [l.id, l.name, l.start_date, l.week_count, l.created_at, l.updated_at]
+      )
+    } else if (l.updated_at > r.updated_at) {
+      await tursoExecute(
+        "UPDATE projects SET name=?,start_date=?,week_count=?,updated_at=? WHERE id=?",
+        [l.name, l.start_date, l.week_count, l.updated_at, l.id]
+      )
+    }
+  }
+
+  // ── project_phases (INSERT OR IGNORE — no updated_at) ────────────────────
+  const [remotePhases, localPhases] = await Promise.all([
+    tursoSelect<ProjectPhase>("SELECT * FROM project_phases"),
+    db.select<ProjectPhase[]>("SELECT * FROM project_phases"),
+  ])
+  const remotePhaseIds = new Set(remotePhases.map(p => p.id))
+  const localPhaseIds  = new Set(localPhases.map(p => p.id))
+
+  for (const p of remotePhases) {
+    if (!localPhaseIds.has(p.id) && localProjectMap.has(p.project_id)) {
+      await db.execute(
+        "INSERT OR IGNORE INTO project_phases (id,project_id,name,color,position,created_at) VALUES ($1,$2,$3,$4,$5,$6)",
+        [p.id, p.project_id, p.name, p.color, p.position, p.created_at]
+      )
+    }
+  }
+  for (const p of localPhases) {
+    if (!remotePhaseIds.has(p.id) && remoteProjectMap.has(p.project_id)) {
+      await tursoExecute(
+        "INSERT OR IGNORE INTO project_phases (id,project_id,name,color,position,created_at) VALUES (?,?,?,?,?,?)",
+        [p.id, p.project_id, p.name, p.color, p.position, p.created_at]
+      )
+    }
+  }
+
+  // ── work_items ─────────────────────────────────────────────────────────────
+  const [remoteItems, localItems] = await Promise.all([
+    tursoSelect<WorkItem>("SELECT * FROM work_items"),
+    db.select<WorkItem[]>("SELECT * FROM work_items"),
+  ])
+  const remoteItemMap = new Map(remoteItems.map(i => [i.id, i]))
+  const localItemMap  = new Map(localItems.map(i => [i.id, i]))
+
+  for (const r of remoteItems) {
+    const l = localItemMap.get(r.id)
+    if (!l && localProjectMap.has(r.project_id)) {
+      await db.execute(
+        `INSERT OR IGNORE INTO work_items (id,project_id,phase_id,title,person,comment,jira_ticket,status,start_week,end_week,position,is_separator,created_at,updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        [r.id, r.project_id, r.phase_id, r.title, r.person, r.comment, r.jira_ticket,
+         r.status, r.start_week, r.end_week, r.position, r.is_separator, r.created_at, r.updated_at]
+      )
+    } else if (l && r.updated_at > l.updated_at) {
+      await db.execute(
+        `UPDATE work_items SET phase_id=$1,title=$2,person=$3,comment=$4,jira_ticket=$5,status=$6,start_week=$7,end_week=$8,position=$9,updated_at=$10 WHERE id=$11`,
+        [r.phase_id, r.title, r.person, r.comment, r.jira_ticket, r.status, r.start_week, r.end_week, r.position, r.updated_at, r.id]
+      )
+    }
+  }
+  for (const l of localItems) {
+    const r = remoteItemMap.get(l.id)
+    if (!r && remoteProjectMap.has(l.project_id)) {
+      await tursoExecute(
+        `INSERT OR IGNORE INTO work_items (id,project_id,phase_id,title,person,comment,jira_ticket,status,start_week,end_week,position,is_separator,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [l.id, l.project_id, l.phase_id, l.title, l.person, l.comment, l.jira_ticket,
+         l.status, l.start_week, l.end_week, l.position, l.is_separator, l.created_at, l.updated_at]
+      )
+    } else if (r && l.updated_at > r.updated_at) {
+      await tursoExecute(
+        `UPDATE work_items SET phase_id=?,title=?,person=?,comment=?,jira_ticket=?,status=?,start_week=?,end_week=?,position=?,updated_at=? WHERE id=?`,
+        [l.phase_id, l.title, l.person, l.comment, l.jira_ticket, l.status, l.start_week, l.end_week, l.position, l.updated_at, l.id]
       )
     }
   }

@@ -103,6 +103,8 @@ pub fn run() {
         migration(3, "create_notes_tables",        include_str!("../migrations/003_notes.sql")),
         migration(4, "create_links_tables",        include_str!("../migrations/004_links.sql")),
         migration(5, "create_work_logs_tables",     include_str!("../migrations/005_work_logs.sql")),
+        migration(6, "create_projects_tables",       include_str!("../migrations/006_projects.sql")),
+        migration(7, "add_jira_ticket",               include_str!("../migrations/007_add_jira_ticket.sql")),
     ];
 
     tauri::Builder::default()

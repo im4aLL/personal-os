@@ -1,7 +1,7 @@
-import { useState } from "react"
 import { FolderKanban } from "lucide-react"
 import { ProjectList } from "#components/projects/project-list"
 import { GanttView } from "#components/projects/gantt-view"
+import { useProjectsStore } from "#store/projects"
 
 function EmptyState() {
   return (
@@ -16,13 +16,14 @@ function EmptyState() {
 }
 
 export default function ProjectsPage() {
-  const [selectedId, setSelectedId] = useState<string | null>("1")
+  const selectedId = useProjectsStore(s => s.selectedId)
+  const project    = useProjectsStore(s => s.projects.find(p => p.id === s.selectedId))
 
   return (
     <div className="flex h-full gap-0 -m-6">
-      <ProjectList selectedId={selectedId} onSelect={setSelectedId} />
+      <ProjectList />
       <div className="flex-1 min-w-0">
-        {selectedId ? <GanttView /> : <EmptyState />}
+        {selectedId && project ? <GanttView project={project} /> : <EmptyState />}
       </div>
     </div>
   )
