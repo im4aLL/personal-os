@@ -9,8 +9,52 @@ async function ensureRemoteSchema() {
   }
 }
 
+type SettingRow = { key: string; value: string; updated_at: string }
+
+async function syncAppSettings() {
+  const db = await getDb()
+  const [remote, local] = await Promise.all([
+    tursoSelect<SettingRow>("SELECT * FROM app_settings"),
+    db.select<SettingRow[]>("SELECT * FROM app_settings"),
+  ])
+
+  const remoteMap = new Map(remote.map(r => [r.key, r]))
+  const localMap  = new Map(local.map(r => [r.key, r]))
+
+  for (const r of remote) {
+    const l = localMap.get(r.key)
+    if (!l) {
+      await db.execute(
+        "INSERT OR IGNORE INTO app_settings (key,value,updated_at) VALUES ($1,$2,$3)",
+        [r.key, r.value, r.updated_at]
+      )
+    } else if (r.updated_at > l.updated_at) {
+      await db.execute(
+        "UPDATE app_settings SET value=$1,updated_at=$2 WHERE key=$3",
+        [r.value, r.updated_at, r.key]
+      )
+    }
+  }
+
+  for (const l of local) {
+    const r = remoteMap.get(l.key)
+    if (!r) {
+      await tursoExecute(
+        "INSERT OR IGNORE INTO app_settings (key,value,updated_at) VALUES (?,?,?)",
+        [l.key, l.value, l.updated_at]
+      )
+    } else if (l.updated_at > r.updated_at) {
+      await tursoExecute(
+        "UPDATE app_settings SET value=?,updated_at=? WHERE key=?",
+        [l.value, l.updated_at, l.key]
+      )
+    }
+  }
+}
+
 export async function syncTodos(): Promise<void> {
   await ensureRemoteSchema()
+  await syncAppSettings()
 
   const db = await getDb()
   const [remoteTodos, localTodos] = await Promise.all([

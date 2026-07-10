@@ -2,6 +2,7 @@ import { createHashRouter, RouterProvider, Navigate, redirect } from "react-rout
 import "./App.css"
 
 import { getTursoConfig, getAppMode } from "#lib/config"
+import { getProfile } from "#lib/profile"
 import { Layout }         from "#components/layout"
 import SetupPage          from "#pages/setup"
 import DashboardPage      from "#pages/dashboard"
@@ -11,10 +12,16 @@ import ProjectsPage       from "#pages/projects"
 import WorkLogPage        from "#pages/work-log"
 import NotesPage          from "#pages/notes"
 
-function requireConfig() {
+async function requireConfig() {
   const mode = getAppMode()
   if (!mode) return redirect("/setup")
   if (mode === "cloud" && !getTursoConfig()) return redirect("/setup")
+  try {
+    const profile = await getProfile()
+    if (!profile) return redirect("/setup")
+  } catch {
+    return redirect("/setup")
+  }
   return null
 }
 

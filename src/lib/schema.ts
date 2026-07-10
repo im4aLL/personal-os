@@ -18,4 +18,9 @@ export const REMOTE_SCHEMAS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_todos_status   ON todos (status)`,
   `CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos (due_date)`,
+  `CREATE TABLE IF NOT EXISTS app_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
 ]

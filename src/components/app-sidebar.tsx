@@ -14,12 +14,6 @@ import {
   SidebarMenuItem,
 } from "#components/ui/sidebar"
 
-const user = {
-  name: "Md Habibullah Al Hadi",
-  email: "hadicse@gmail.com",
-  avatar: "",
-}
-
 const items = [
   { title: "Dashboard",       to: "/dashboard", icon: Home          },
   { title: "Save Links",     to: "/links",    icon: Link          },
@@ -74,7 +68,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} />
+        <NavUser />
       </SidebarFooter>
     </Sidebar>
   )

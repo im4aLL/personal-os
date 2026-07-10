@@ -31,20 +31,25 @@ async fn import_db(app: AppHandle, src: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let migration = || tauri_plugin_sql::Migration {
-        version: 1,
-        description: "create_todos_table",
-        sql: include_str!("../migrations/001_todos.sql"),
+    let migration = |version: i64, description: &'static str, sql: &'static str| tauri_plugin_sql::Migration {
+        version,
+        description,
+        sql,
         kind: tauri_plugin_sql::MigrationKind::Up,
     };
+
+    let migrations = || vec![
+        migration(1, "create_todos_table",        include_str!("../migrations/001_todos.sql")),
+        migration(2, "create_app_settings_table", include_str!("../migrations/002_app_settings.sql")),
+    ];
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_sql::Builder::new()
-                .add_migrations("sqlite:personal-os-local.db", vec![migration()])
-                .add_migrations("sqlite:personal-os-cloud.db", vec![migration()])
+                .add_migrations("sqlite:personal-os-local.db", migrations())
+                .add_migrations("sqlite:personal-os-cloud.db", migrations())
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![export_db, import_db])
