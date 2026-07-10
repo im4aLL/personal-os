@@ -81,13 +81,13 @@ export function TodoCard({ todo, onEdit, onDelete, isOverlay }: TodoCardProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEdit(todo)}>
+                <DropdownMenuItem onSelect={() => onEdit(todo)}>
                   <Pencil />
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
-                  onClick={() => onDelete(todo.id)}
+                  onSelect={() => onDelete(todo.id)}
                 >
                   <Trash2 />
                   Delete

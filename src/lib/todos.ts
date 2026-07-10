@@ -1,5 +1,6 @@
 import { getDb } from "#lib/db"
 import { syncTodos } from "#lib/sync"
+import { tursoExecute } from "#lib/turso"
 import { getAppMode } from "#lib/config"
 import type { Todo, CreateTodoInput, UpdateTodoInput } from "#lib/types/todo"
 import { randomUUID } from "#lib/uuid"
@@ -79,6 +80,11 @@ export async function updateTodo(id: string, input: UpdateTodoInput): Promise<vo
 export async function deleteTodo(id: string): Promise<void> {
   const db = await getDb()
   await db.execute("DELETE FROM todos WHERE id = $1", [id])
+  // In cloud mode, delete from Turso immediately — otherwise the next
+  // background sync would see the todo still in the remote and pull it back.
+  if (getAppMode() === "cloud") {
+    await tursoExecute("DELETE FROM todos WHERE id = ?", [id])
+  }
   backgroundSync()
 }
 

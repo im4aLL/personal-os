@@ -1,16 +1,25 @@
 import Database from "@tauri-apps/plugin-sql"
 import { invoke } from "@tauri-apps/api/core"
+import { getAppMode } from "#lib/config"
 
-const DB_PATH = "sqlite:personal-os.db"
-let _db: Database | null = null
+const LOCAL_DB = "sqlite:personal-os-local.db"
+const CLOUD_DB = "sqlite:personal-os-cloud.db"
+
+let _localDb: Database | null = null
+let _cloudDb: Database | null = null
 
 export async function getDb(): Promise<Database> {
-  if (!_db) _db = await Database.load(DB_PATH)
-  return _db
+  if (getAppMode() === "cloud") {
+    if (!_cloudDb) _cloudDb = await Database.load(CLOUD_DB)
+    return _cloudDb
+  }
+  if (!_localDb) _localDb = await Database.load(LOCAL_DB)
+  return _localDb
 }
 
 export function resetDb(): void {
-  _db = null
+  _localDb = null
+  _cloudDb = null
 }
 
 export async function exportDb(destPath: string): Promise<void> {
