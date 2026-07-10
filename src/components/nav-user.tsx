@@ -1,17 +1,11 @@
-import {
-  BadgeCheck,
-  Bell,
-  ChevronsUpDown,
-  CreditCard,
-  LogOut,
-  Sparkles,
-} from "lucide-react"
+import { useState } from "react"
+import { useNavigate } from "react-router"
+import { ChevronsUpDown, RefreshCw, Unplug } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "#components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -23,6 +17,9 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "#components/ui/sidebar"
+import { clearTursoConfig } from "#lib/config"
+import { syncTodos } from "#lib/sync"
+import { cn } from "#lib/utils"
 
 interface NavUserProps {
   user: {
@@ -34,6 +31,32 @@ interface NavUserProps {
 
 export function NavUser({ user }: NavUserProps) {
   const { isMobile } = useSidebar()
+  const navigate = useNavigate()
+  const [syncLabel,  setSyncLabel]  = useState("Sync Now")
+  const [syncing,    setSyncing]    = useState(false)
+  const [syncStatus, setSyncStatus] = useState<"idle" | "done" | "error">("idle")
+
+  async function handleSync() {
+    if (syncing) return
+    setSyncing(true)
+    setSyncLabel("Syncing...")
+    try {
+      await syncTodos()
+      setSyncStatus("done")
+      setSyncLabel("Synced")
+      setTimeout(() => { setSyncing(false); setSyncStatus("idle"); setSyncLabel("Sync") }, 3000)
+    } catch (err) {
+      console.error("Sync error:", err)
+      setSyncStatus("error")
+      setSyncLabel("Sync failed")
+      setTimeout(() => { setSyncing(false); setSyncStatus("idle"); setSyncLabel("Sync") }, 4000)
+    }
+  }
+
+  function handleDisconnect() {
+    clearTursoConfig()
+    navigate("/setup", { replace: true })
+  }
 
   return (
     <SidebarMenu>
@@ -57,12 +80,14 @@ export function NavUser({ user }: NavUserProps) {
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
+
           <DropdownMenuContent
             className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
           >
+            {/* User info */}
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
@@ -77,32 +102,30 @@ export function NavUser({ user }: NavUserProps) {
                 </div>
               </div>
             </DropdownMenuLabel>
+
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Sparkles />
-                Upgrade to Pro
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
+
+            {/* Sync */}
+            <DropdownMenuItem
+              onClick={handleSync}
+              className={cn(
+                syncStatus === "done"  && "text-green-500 focus:text-green-500",
+                syncStatus === "error" && "text-destructive focus:text-destructive",
+              )}
+            >
+              <RefreshCw className={cn("size-4", syncing && "animate-spin")} />
+              {syncLabel}
+            </DropdownMenuItem>
+
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BadgeCheck />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Bell />
-                Notifications
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <LogOut />
-              Log out
+
+            {/* Disconnect */}
+            <DropdownMenuItem
+              onClick={handleDisconnect}
+              className="text-destructive focus:text-destructive"
+            >
+              <Unplug />
+              Disconnect database
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
