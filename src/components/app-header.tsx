@@ -7,8 +7,10 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from "#components/ui/breadcrumb"
+import { ThemeToggle } from "#components/theme-toggle"
 
 const titles: Record<string, string> = {
+  "/dashboard": "Dashboard",
   "/links":    "Save Links",
   "/todo":     "Todo",
   "/projects": "Project Planner",
@@ -33,6 +35,9 @@ export function AppHeader() {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
+      </div>
+      <div className="ml-auto px-4">
+        <ThemeToggle />
       </div>
     </header>
   )

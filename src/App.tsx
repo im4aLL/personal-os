@@ -2,6 +2,7 @@ import { createHashRouter, RouterProvider, Navigate } from "react-router"
 import "./App.css"
 
 import { Layout }       from "#components/layout"
+import DashboardPage    from "#pages/dashboard"
 import LinksPage        from "#pages/links"
 import TodoPage         from "#pages/todo"
 import ProjectsPage     from "#pages/projects"
@@ -13,7 +14,8 @@ const router = createHashRouter([
     path: "/",
     element: <Layout />,
     children: [
-      { index: true, element: <Navigate to="/links" replace /> },
+      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { path: "dashboard", element: <DashboardPage />  },
       { path: "links",    element: <LinksPage />    },
       { path: "todo",     element: <TodoPage />     },
       { path: "projects", element: <ProjectsPage /> },
