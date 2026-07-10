@@ -46,10 +46,11 @@ export function NavUser({ user }: NavUserProps) {
       setSyncLabel("Synced")
       setTimeout(() => { setSyncing(false); setSyncStatus("idle"); setSyncLabel("Sync") }, 3000)
     } catch (err) {
-      console.error("Sync error:", err)
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error("Sync error:", msg)
       setSyncStatus("error")
-      setSyncLabel("Sync failed")
-      setTimeout(() => { setSyncing(false); setSyncStatus("idle"); setSyncLabel("Sync") }, 4000)
+      setSyncLabel(msg)
+      setTimeout(() => { setSyncing(false); setSyncStatus("idle"); setSyncLabel("Sync") }, 5000)
     }
   }
 

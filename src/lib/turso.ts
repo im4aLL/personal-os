@@ -1,7 +1,7 @@
 import { getTursoConfig } from "#lib/config"
 
-type TursoArg      = null | { type: "text" | "integer" | "real"; value: string }
-type TursoColValue = null | { type: "text" | "integer" | "real"; value: string }
+type TursoArg      = { type: "text" | "integer" | "real" | "null"; value?: string }
+type TursoColValue = null | { type: "text" | "integer" | "real" | "null"; value?: string }
 
 interface TursoResult {
   cols: { name: string }[]
@@ -19,17 +19,17 @@ function getConfig() {
 }
 
 function toArg(val: unknown): TursoArg {
-  if (val === null || val === undefined) return null
+  if (val === null || val === undefined) return { type: "null" }
   if (typeof val === "number")
     return { type: Number.isInteger(val) ? "integer" : "real", value: String(val) }
   return { type: "text", value: String(val) }
 }
 
 function parseValue(val: TursoColValue): string | number | null {
-  if (val === null)              return null
-  if (val.type === "integer")    return parseInt(val.value, 10)
-  if (val.type === "real")       return parseFloat(val.value)
-  return val.value
+  if (val === null || val.type === "null") return null
+  if (val.type === "integer") return parseInt(val.value ?? "0", 10)
+  if (val.type === "real")    return parseFloat(val.value ?? "0")
+  return val.value ?? null
 }
 
 async function pipeline(sql: string, args: unknown[] = []): Promise<TursoResult> {
