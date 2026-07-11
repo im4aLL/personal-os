@@ -114,3 +114,19 @@ export const REMOTE_SCHEMAS = [
   // the "duplicate column" error when the column already exists.
   `ALTER TABLE work_items ADD COLUMN jira_ticket TEXT`,
 ]
+
+// Applies every remote schema statement, tolerating "duplicate column" errors
+// thrown by ALTER TABLE ADD COLUMN when the column already exists.
+// Used by both the setup flow and background sync.
+export async function applyRemoteSchema(
+  exec: (sql: string) => Promise<void>
+): Promise<void> {
+  for (const sql of REMOTE_SCHEMAS) {
+    try {
+      await exec(sql)
+    } catch (err) {
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
+      if (!msg.includes("duplicate column")) throw err
+    }
+  }
+}

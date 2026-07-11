@@ -1,6 +1,6 @@
 import { getDb } from "#lib/db"
 import { tursoExecute, tursoSelect } from "#lib/turso"
-import { REMOTE_SCHEMAS } from "#lib/schema"
+import { applyRemoteSchema } from "#lib/schema"
 import type { Todo } from "#lib/types/todo"
 import type { Note, NoteTag } from "#lib/types/note"
 import type { Link, LinkTag } from "#lib/types/link"
@@ -13,16 +13,7 @@ import { useWorkLogsStore } from "#store/work-logs"
 import { useProjectsStore } from "#store/projects"
 
 async function ensureRemoteSchema() {
-  for (const sql of REMOTE_SCHEMAS) {
-    try {
-      await tursoExecute(sql)
-    } catch (err) {
-      // ALTER TABLE ADD COLUMN throws if the column already exists — ignore that
-      // so re-running sync stays safe. Re-throw anything else.
-      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
-      if (!msg.includes("duplicate column")) throw err
-    }
-  }
+  await applyRemoteSchema(tursoExecute)
 }
 
 type SettingRow = { key: string; value: string; updated_at: string }

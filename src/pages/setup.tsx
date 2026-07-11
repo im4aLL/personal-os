@@ -8,7 +8,7 @@ import { DatabaseZap, HardDrive, Cloud, UserCircle } from "lucide-react"
 import { saveTursoConfig, clearTursoConfig, setAppMode } from "#lib/config"
 import { saveProfile, getProfile } from "#lib/profile"
 import { tursoExecute, tursoSelect } from "#lib/turso"
-import { REMOTE_SCHEMAS } from "#lib/schema"
+import { applyRemoteSchema } from "#lib/schema"
 import { syncTodos } from "#lib/sync"
 import { Button } from "#components/ui/button"
 import {
@@ -70,7 +70,7 @@ export default function SetupPage() {
       clearTursoConfig()
       saveTursoConfig({ url, token: values.token })
       await tursoSelect("SELECT 1")
-      for (const sql of REMOTE_SCHEMAS) await tursoExecute(sql)
+      await applyRemoteSchema(tursoExecute)
       setAppMode("cloud")
       // Pull existing data (profile, todos) from cloud before deciding next step
       await syncTodos()
