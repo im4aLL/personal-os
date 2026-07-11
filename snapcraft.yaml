@@ -1,0 +1,119 @@
+name: personalos
+base: core22
+version: "1.0.0"
+summary: Your personal operating system for tasks, notes, links and projects
+description: |
+  Personal OS is a local-first desktop app for managing todos, notes,
+  saved links, work logs and project timelines, with optional cloud sync.
+
+grade: stable
+confinement: strict
+
+layout:
+  /usr/lib/$SNAPCRAFT_ARCH_TRIPLET/webkit2gtk-4.1:
+    bind: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/webkit2gtk-4.1
+
+apps:
+  personalos:
+    command: usr/bin/personal-os
+    desktop: usr/share/applications/personalos.desktop
+    extensions:
+      - gnome
+    plugs:
+      - network
+      - network-bind
+
+package-repositories:
+  - type: apt
+    components:
+      - main
+    suites:
+      - noble
+    key-id: 78E1918602959B9C59103100F1831DDAFC42E99D
+    url: http://ppa.launchpad.net/snappy-dev/snapcraft-daily/ubuntu
+
+parts:
+  build-app:
+    plugin: dump
+    source: .
+
+    build-snaps:
+      - node/22/stable
+      - rustup/latest/stable
+
+    build-packages:
+      - build-essential
+      - curl
+      - wget
+      - file
+      - dpkg
+      - libwebkit2gtk-4.1-dev
+      - libxdo-dev
+      - libssl-dev
+      - libayatana-appindicator3-dev
+      - librsvg2-dev
+
+    stage-packages:
+      - libwebkit2gtk-4.1-0
+      - libayatana-appindicator3-1
+
+    override-build: |
+      set -eux
+
+      # The rustup snap provides rustup, but it does not automatically
+      # configure a default Rust toolchain inside the build container.
+      rustup set profile minimal
+      rustup toolchain install stable
+      rustup default stable
+
+      # Print versions to make build-environment problems easier to diagnose.
+      node --version
+      npm --version
+      rustc --version
+      cargo --version
+
+      # Use the lock file for a reproducible frontend build.
+      npm ci
+
+      # Build the Tauri Debian package.
+      npm run tauri build -- --bundles deb
+
+      # Extract the generated Debian package into the snap.
+      dpkg -x src-tauri/target/release/bundle/deb/*.deb \
+        "$SNAPCRAFT_PART_INSTALL"
+
+      # Tauri names the desktop entry from productName ("Personal OS.desktop").
+      # Snapcraft expects the path declared above, so normalize it after extract.
+      desktop_dir="$SNAPCRAFT_PART_INSTALL/usr/share/applications"
+      desktop_file="$(find "$desktop_dir" -maxdepth 1 -type f -name "*.desktop" -print -quit)"
+      if [ -z "$desktop_file" ]; then
+        ls -la "$desktop_dir"
+        exit 1
+      fi
+      mv "$desktop_file" "$desktop_dir/personalos.desktop"
+
+      # Ensure the desktop entry launches the snap app and uses the packaged icon.
+      sed -i \
+        -e "s|^Exec=.*|Exec=personalos|" \
+        -e 's|^Icon=.*|Icon=${SNAP}/usr/share/icons/hicolor/32x32/apps/personal-os.png|' \
+        "$SNAPCRAFT_PART_INSTALL/usr/share/applications/personalos.desktop"
+
+      # Let the GNOME extension provide the matching GLVND/Mesa stack. The
+      # WebKitGTK deb dependencies pull older GL loader libraries into the app
+      # snap, which can mismatch the GNOME runtime DRI drivers at launch.
+      lib_dir="$SNAPCRAFT_PART_INSTALL/usr/lib/$SNAPCRAFT_ARCH_TRIPLET"
+      rm -f \
+        "$lib_dir"/libEGL.so* \
+        "$lib_dir"/libEGL_mesa.so* \
+        "$lib_dir"/libGL.so* \
+        "$lib_dir"/libGLESv2.so* \
+        "$lib_dir"/libGLX.so* \
+        "$lib_dir"/libGLX_mesa.so* \
+        "$lib_dir"/libGLdispatch.so* \
+        "$lib_dir"/libOpenGL.so* \
+        "$lib_dir"/libgbm.so* \
+        "$lib_dir"/libdrm_amdgpu.so* \
+        "$lib_dir"/libdrm_intel.so* \
+        "$lib_dir"/libdrm_nouveau.so* \
+        "$lib_dir"/libdrm_radeon.so*
+      rm -rf "$lib_dir/dri"

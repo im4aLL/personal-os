@@ -34,6 +34,10 @@ npm run tauri build  # build production desktop bundle
 There is no separate lint/test script configured. Type checking happens via `tsc`
 during `npm run build`. Use it to validate TypeScript changes.
 
+For Snapcraft packaging, use `sg lxd -c 'snapcraft pack'` if the current shell's
+`id` output does not include the `lxd` group. The `hadi` user is configured as a
+member of `lxd`, but existing shells may have stale group membership until logout.
+
 ## Project Structure
 
 ```
