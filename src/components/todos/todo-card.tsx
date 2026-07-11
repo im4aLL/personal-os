@@ -58,7 +58,7 @@ export function TodoCard({ todo, onEdit, onDelete, isOverlay }: TodoCardProps) {
       {todo.priority && (
         <span className={cn("absolute inset-y-0 left-0 w-1", priorityConfig[todo.priority].strip)} />
       )}
-      <CardContent className="p-3 space-y-2">
+      <CardContent className="p-2.5 space-y-1.5">
         {/* Title row */}
         <div className="flex items-center gap-1.5">
           <button
@@ -103,7 +103,7 @@ export function TodoCard({ todo, onEdit, onDelete, isOverlay }: TodoCardProps) {
 
         {/* Description */}
         {todo.description && (
-          <p className="pl-5 text-xs text-muted-foreground line-clamp-2">
+          <p className="pl-5 text-xs text-muted-foreground line-clamp-1">
             {todo.description}
           </p>
         )}
