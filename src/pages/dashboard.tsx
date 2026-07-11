@@ -80,7 +80,15 @@ function WidgetHeader({ title, icon: Icon, to }: { title: string; icon: React.El
 }
 
 function EmptyRow({ text }: { text: string }) {
-  return <p className="text-xs text-muted-foreground py-2">{text}</p>
+  return <p className="text-xs text-muted-foreground/70 py-3 text-center">{text}</p>
+}
+
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 5)  return "Working late"
+  if (h < 12) return "Good morning"
+  if (h < 18) return "Good afternoon"
+  return "Good evening"
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -123,10 +131,10 @@ export default function DashboardPage() {
   ]
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6">
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl font-semibold">Good to see you</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{greeting()}</h1>
         <p className="text-muted-foreground mt-1 text-sm flex items-center gap-1.5">
           <Calendar className="size-3.5" /> {today}
         </p>
@@ -135,16 +143,17 @@ export default function DashboardPage() {
       {/* Stat cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {stats.map(stat => (
-          <Link key={stat.label} to={stat.to}>
-            <Card className="py-0 transition-colors hover:bg-accent/40">
+          <Link key={stat.label} to={stat.to} className="group">
+            <Card className="py-0 transition-all hover:shadow-sm hover:border-foreground/15">
               <CardContent className="flex items-center gap-3 p-4">
-                <div className={cn("flex size-10 items-center justify-center rounded-lg shrink-0", stat.tint)}>
+                <div className={cn("flex size-11 items-center justify-center rounded-xl shrink-0 transition-transform group-hover:scale-105", stat.tint)}>
                   <stat.icon className="size-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-2xl font-semibold leading-none">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1 truncate">{stat.label}</p>
+                  <p className="text-2xl font-semibold leading-none tabular-nums">{stat.value}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 truncate">{stat.label}</p>
                 </div>
+                <ArrowRight className="size-4 ml-auto text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors shrink-0" />
               </CardContent>
             </Card>
           </Link>
@@ -160,7 +169,7 @@ export default function DashboardPage() {
             {inProgress.length === 0 ? (
               <EmptyRow text="Nothing in progress right now" />
             ) : inProgress.slice(0, 5).map(todo => (
-              <div key={todo.id} className="flex items-center gap-2.5 py-1.5">
+              <div key={todo.id} className="flex items-center gap-2.5 py-1.5 px-2 -mx-2 rounded-md hover:bg-accent/50 transition-colors">
                 <Circle className="size-3.5 text-blue-500 shrink-0" />
                 <span className="text-sm flex-1 truncate">{todo.title}</span>
                 {todo.priority && (
@@ -180,7 +189,7 @@ export default function DashboardPage() {
             {recentWork.length === 0 ? (
               <EmptyRow text="No work logged yet" />
             ) : recentWork.map(work => (
-              <div key={work.id} className="flex items-center gap-2.5 py-1.5">
+              <div key={work.id} className="flex items-center gap-2.5 py-1.5 px-2 -mx-2 rounded-md hover:bg-accent/50 transition-colors">
                 <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
                 <span className="text-sm flex-1 truncate">{work.title}</span>
                 <span className="text-xs text-muted-foreground shrink-0">{shortDate(work.start_date)}</span>
@@ -196,7 +205,7 @@ export default function DashboardPage() {
             {recentNotes.length === 0 ? (
               <EmptyRow text="No notes yet" />
             ) : recentNotes.map(note => (
-              <div key={note.id} className="flex items-center gap-2.5 py-1.5">
+              <div key={note.id} className="flex items-center gap-2.5 py-1.5 px-2 -mx-2 rounded-md hover:bg-accent/50 transition-colors">
                 <NotebookPen className="size-3.5 text-violet-500 shrink-0" />
                 <span className="text-sm flex-1 truncate">{noteDisplayTitle(note)}</span>
                 <span className="text-xs text-muted-foreground shrink-0">{relativeDate(note.updated_at)}</span>
@@ -212,7 +221,7 @@ export default function DashboardPage() {
             {recentLinks.length === 0 ? (
               <EmptyRow text="No links saved yet" />
             ) : recentLinks.map(link => (
-              <div key={link.id} className="flex items-center gap-2.5 py-1.5">
+              <div key={link.id} className="flex items-center gap-2.5 py-1.5 px-2 -mx-2 rounded-md hover:bg-accent/50 transition-colors">
                 {link.favicon_url ? (
                   <img src={link.favicon_url} alt="" className="size-3.5 shrink-0 rounded-sm" />
                 ) : (
@@ -245,8 +254,11 @@ export default function DashboardPage() {
                     {currentWeek ? `Week ${week}/${project.week_count}` : `${project.week_count} weeks`}
                   </span>
                 </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
+                <div className="flex items-center gap-2.5">
+                  <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums w-9 text-right shrink-0">{pct}%</span>
                 </div>
               </div>
             )

@@ -13,10 +13,10 @@ import {
 import { cn } from "#lib/utils"
 import type { Todo, TodoPriority } from "#lib/types/todo"
 
-const priorityConfig: Record<TodoPriority, { label: string; className: string }> = {
-  low:    { label: "Low",    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"   },
-  medium: { label: "Medium", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" },
-  high:   { label: "High",   className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"   },
+const priorityConfig: Record<TodoPriority, { label: string; className: string; strip: string }> = {
+  low:    { label: "Low",    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",   strip: "bg-sky-500"   },
+  medium: { label: "Medium", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20", strip: "bg-amber-500" },
+  high:   { label: "High",   className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",   strip: "bg-red-500"   },
 }
 
 function formatDueDate(dateStr: string) {
@@ -49,11 +49,15 @@ export function TodoCard({ todo, onEdit, onDelete, isOverlay }: TodoCardProps) {
     <Card
       ref={setNodeRef}
       className={cn(
-        "group select-none transition-shadow py-0 gap-0 shadow-none",
+        "group relative overflow-hidden select-none py-0 gap-0 shadow-none",
+        "transition-all duration-150 hover:shadow-sm hover:border-foreground/15",
         isDragging && !isOverlay && "opacity-30",
-        isOverlay && "rotate-1 cursor-grabbing",
+        isOverlay && "rotate-2 shadow-lg cursor-grabbing",
       )}
     >
+      {todo.priority && (
+        <span className={cn("absolute inset-y-0 left-0 w-1", priorityConfig[todo.priority].strip)} />
+      )}
       <CardContent className="p-3 space-y-2">
         {/* Title row */}
         <div className="flex items-center gap-1.5">
