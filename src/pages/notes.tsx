@@ -18,7 +18,7 @@ function EmptyState() {
 export default function NotesPage() {
   const selectedId = useNotesStore(s => s.selectedId)
   return (
-    <div className="flex h-full gap-0 -m-6">
+    <div className="flex h-[calc(100%+3rem)] gap-0 -m-6">
       <NoteList />
       <div className="flex-1 min-w-0">
         {selectedId ? <NoteEditor noteId={selectedId} /> : <EmptyState />}
