@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
+@import "./hljs-theme.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -131,3 +132,4 @@
 .dark input[type="number"]::-webkit-outer-spin-button {
   filter: invert(1);
 }
+

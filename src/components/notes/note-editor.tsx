@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from "react"
-import { Eye, Pencil, Trash2, Check, Loader2, Minus, Plus } from "lucide-react"
+import { Eye, Pencil, Trash2, Check, Loader2, Minus, Plus, ListTodo } from "lucide-react"
 import { useDebounce } from "use-debounce"
+import { toast } from "sonner"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import rehypeHighlight from "rehype-highlight"
 import { Button } from "#components/ui/button"
 import { Separator } from "#components/ui/separator"
 import { Textarea } from "#components/ui/textarea"
 import { NoteTagInput } from "./note-tag-input"
 import { getNoteById, updateNote, deleteNote } from "#lib/notes"
+import { createTodo } from "#lib/todos"
 import { useNotesStore } from "#store/notes"
+import { useTodosStore } from "#store/todos"
 import type { NoteWithTags } from "#lib/types/note"
 import { cn } from "#lib/utils"
+
+const TODO_TITLE_MAX_LENGTH = 100
 
 type Mode       = "edit" | "preview"
 type SaveStatus = "idle" | "saving" | "saved"
@@ -44,6 +50,9 @@ export function NoteEditor({ noteId }: NoteEditorProps) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle")
   const [loaded,     setLoaded]     = useState(false)
   const [fontSize,   setFontSize]   = useState(loadFontSize)
+  const [selectionButton, setSelectionButton] = useState<{ top: number; left: number; text: string } | null>(null)
+
+  const selectionButtonRef = useRef<HTMLButtonElement>(null)
 
   const [debouncedTitle]   = useDebounce(title,   1000)
   const [debouncedContent] = useDebounce(content, 1000)
@@ -122,16 +131,61 @@ export function NoteEditor({ noteId }: NoteEditorProps) {
     const el = e.currentTarget
     const maxScroll = el.scrollHeight - el.clientHeight
     scrollRatioRef.current = maxScroll > 0 ? el.scrollTop / maxScroll : 0
+    setSelectionButton(null)
   }
 
   function handleModeChange(next: Mode) {
     setMode(next)
+    setSelectionButton(null)
     requestAnimationFrame(() => {
       const el = next === "edit" ? textareaRef.current : previewRef.current
       if (!el) return
       const maxScroll = el.scrollHeight - el.clientHeight
       el.scrollTop = scrollRatioRef.current * maxScroll
     })
+  }
+
+  // Dismiss the floating "Add as todo" button on any click outside of it.
+  useEffect(() => {
+    if (!selectionButton) return
+    function handleDocMouseDown(e: MouseEvent) {
+      if (selectionButtonRef.current?.contains(e.target as Node)) return
+      setSelectionButton(null)
+    }
+    document.addEventListener("mousedown", handleDocMouseDown)
+    return () => document.removeEventListener("mousedown", handleDocMouseDown)
+  }, [selectionButton])
+
+  function handlePreviewSelect() {
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed || !previewRef.current) return
+
+    const text = selection.toString()
+    if (!text.trim()) return
+    if (!selection.anchorNode || !previewRef.current.contains(selection.anchorNode)) return
+
+    const rect = selection.getRangeAt(0).getBoundingClientRect()
+    setSelectionButton({ top: rect.top - 40, left: rect.left + rect.width / 2, text })
+  }
+
+  async function handleAddSelectionAsTodo(text: string) {
+    const trimmed = text.trim().replace(/\s+/g, " ")
+    setSelectionButton(null)
+    if (!trimmed) return
+
+    const title = trimmed.length > TODO_TITLE_MAX_LENGTH
+      ? trimmed.slice(0, TODO_TITLE_MAX_LENGTH).trimEnd() + "…"
+      : trimmed
+    const description = trimmed.length > TODO_TITLE_MAX_LENGTH ? trimmed : null
+
+    try {
+      const created = await createTodo({ title, description })
+      useTodosStore.getState().addTodo(created)
+      toast.success("Added to todo")
+    } catch (err) {
+      console.error("Failed to create todo from selection:", err)
+      toast.error("Failed to add todo")
+    }
   }
 
   function changeFontSize(delta: number) {
@@ -259,18 +313,33 @@ export function NoteEditor({ noteId }: NoteEditorProps) {
           <div
             ref={previewRef}
             onScroll={handleScroll}
+            onMouseDown={() => setSelectionButton(null)}
+            onMouseUp={handlePreviewSelect}
             style={{ fontSize }}
             className="h-full overflow-y-auto px-5 py-4 prose prose-neutral dark:prose-invert max-w-none"
           >
 
             {content.trim() ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{content}</ReactMarkdown>
             ) : (
               <p className="text-muted-foreground italic text-sm">Nothing to preview yet.</p>
             )}
           </div>
         )}
       </div>
+
+      {selectionButton && (
+        <Button
+          ref={selectionButtonRef}
+          size="xs"
+          className="fixed z-50 -translate-x-1/2 shadow-md"
+          style={{ top: selectionButton.top, left: selectionButton.left }}
+          onClick={() => handleAddSelectionAsTodo(selectionButton.text)}
+        >
+          <ListTodo className="size-3" />
+          Add as todo
+        </Button>
+      )}
     </div>
   )
 }
