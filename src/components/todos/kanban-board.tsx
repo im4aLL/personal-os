@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   MouseSensor,
@@ -10,6 +11,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core"
+import { arrayMove } from "@dnd-kit/sortable"
 import { Archive, Search } from "lucide-react"
 import { toast } from "sonner"
 
@@ -27,7 +29,7 @@ import { Button, buttonVariants } from "#components/ui/button"
 import { Input } from "#components/ui/input"
 import { Skeleton } from "#components/ui/skeleton"
 import { cn } from "#lib/utils"
-import { createTodo, updateTodo, deleteTodo, deleteTodos, archiveTodos } from "#lib/todos"
+import { createTodo, updateTodo, updateTodoPositions, deleteTodo, deleteTodos, archiveTodos } from "#lib/todos"
 import type { Todo, TodoStatus } from "#lib/types/todo"
 import { createWorkLog } from "#lib/work-logs"
 import { useTodosStore } from "#store/todos"
@@ -42,10 +44,11 @@ const COLUMNS: TodoStatus[] = ["todo", "in_progress", "completed"]
 export function KanbanBoard() {
   const todos   = useTodosStore(s => s.todos)
   const loading = useTodosStore(s => s.loading)
-  const { loadTodos, addTodo, patchTodo, removeTodo, removeTodos } = useTodosStore.getState()
+  const { loadTodos, addTodo, patchTodo, removeTodo, removeTodos, reorderTodos } = useTodosStore.getState()
 
   const [search,        setSearch]        = useState("")
   const [activeId,      setActiveId]      = useState<string | null>(null)
+  const [overStatus,    setOverStatus]    = useState<TodoStatus | null>(null)
   const [dialogOpen,    setDialogOpen]    = useState(false)
   const [editingTodo,   setEditingTodo]   = useState<Todo | null>(null)
   const [defaultStatus, setDefaultStatus] = useState<TodoStatus>("todo")
@@ -83,10 +86,21 @@ export function KanbanBoard() {
   // ── DnD handlers ────────────────────────────────────────────────
   function handleDragStart({ active }: DragStartEvent) {
     setActiveId(active.id as string)
+    setOverStatus(todos.find(t => t.id === active.id)?.status ?? null)
+  }
+
+  function handleDragOver({ over }: DragOverEvent) {
+    if (!over) { setOverStatus(null); return }
+    const overId = over.id as string
+    const status = COLUMNS.includes(overId as TodoStatus)
+      ? (overId as TodoStatus)
+      : todos.find(t => t.id === overId)?.status ?? null
+    setOverStatus(status)
   }
 
   async function handleDragEnd({ active, over }: DragEndEvent) {
     setActiveId(null)
+    setOverStatus(null)
     if (!over) return
 
     const id         = active.id as string
@@ -94,15 +108,35 @@ export function KanbanBoard() {
     const activeTodo = todos.find(t => t.id === id)
     if (!activeTodo) return
 
-    const targetStatus = COLUMNS.includes(overId as TodoStatus)
+    const overIsColumn = COLUMNS.includes(overId as TodoStatus)
+    const sourceStatus  = activeTodo.status
+    const targetStatus  = overIsColumn
       ? (overId as TodoStatus)
-      : todos.find(t => t.id === overId)?.status ?? activeTodo.status
+      : todos.find(t => t.id === overId)?.status ?? sourceStatus
 
-    if (targetStatus === activeTodo.status) return
+    const targetColumnIds = byStatus[targetStatus].map(t => t.id)
 
-    patchTodo(id, { status: targetStatus })
+    let newTargetIds: string[]
+    if (sourceStatus === targetStatus) {
+      const oldIndex = targetColumnIds.indexOf(id)
+      const newIndex = overIsColumn ? targetColumnIds.length - 1 : targetColumnIds.indexOf(overId)
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+      newTargetIds = arrayMove(targetColumnIds, oldIndex, newIndex)
+    } else {
+      const insertIndex = overIsColumn ? targetColumnIds.length : Math.max(0, targetColumnIds.indexOf(overId))
+      newTargetIds = [...targetColumnIds.slice(0, insertIndex), id, ...targetColumnIds.slice(insertIndex)]
+    }
+
+    if (sourceStatus !== targetStatus) {
+      patchTodo(id, { status: targetStatus })
+    }
+    reorderTodos(newTargetIds)
+
     try {
-      await updateTodo(id, { status: targetStatus })
+      if (sourceStatus !== targetStatus) {
+        await updateTodo(id, { status: targetStatus })
+      }
+      await updateTodoPositions(newTargetIds.map((tid, i) => ({ id: tid, position: i })))
     } catch (err) {
       console.error("Failed to update todo:", err)
       loadTodos() // revert on failure
@@ -245,8 +279,9 @@ export function KanbanBoard() {
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveId(null)}
+        onDragCancel={() => { setActiveId(null); setOverStatus(null) }}
       >
         <div className="flex gap-4 flex-1 min-h-0 overflow-x-auto pb-2">
           {COLUMNS.map(status => (
@@ -254,6 +289,7 @@ export function KanbanBoard() {
               key={status}
               status={status}
               todos={byStatus[status]}
+              isDropTarget={activeId !== null && overStatus === status}
               onAdd={() => openCreate(status)}
               onEdit={openEdit}
               onDelete={handleDelete}

@@ -1,4 +1,5 @@
-import { useDraggable } from "@dnd-kit/core"
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { Calendar, ClipboardList, GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 
 import { Badge } from "#components/ui/badge"
@@ -13,10 +14,10 @@ import {
 import { cn } from "#lib/utils"
 import type { Todo, TodoPriority } from "#lib/types/todo"
 
-const priorityConfig: Record<TodoPriority, { label: string; className: string; strip: string }> = {
-  low:    { label: "Low",    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",   strip: "bg-sky-500"   },
-  medium: { label: "Medium", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20", strip: "bg-amber-500" },
-  high:   { label: "High",   className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",   strip: "bg-red-500"   },
+const priorityConfig: Record<TodoPriority, { label: string; className: string }> = {
+  low:    { label: "Low",    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20" },
+  medium: { label: "Medium", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" },
+  high:   { label: "High",   className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20" },
 }
 
 function formatDueDate(dateStr: string) {
@@ -41,25 +42,28 @@ interface TodoCardProps {
 }
 
 export function TodoCard({ todo, onEdit, onDelete, onAddWorkLog, isOverlay }: TodoCardProps) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: todo.id,
     disabled: isOverlay,
   })
 
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
   return (
     <Card
       ref={setNodeRef}
+      style={style}
       className={cn(
-        "group relative overflow-hidden select-none py-0 gap-0 shadow-none",
-        "transition-all duration-150 hover:shadow-sm hover:border-foreground/15",
+        "select-none py-0 gap-0 shadow-none",
+        "transition-colors hover:bg-accent/50",
         isDragging && !isOverlay && "opacity-30",
         isOverlay && "rotate-2 shadow-lg cursor-grabbing",
       )}
     >
-      {todo.priority && (
-        <span className={cn("absolute inset-y-0 left-0 w-1", priorityConfig[todo.priority].strip)} />
-      )}
-      <CardContent className="p-2.5 space-y-1.5">
+      <CardContent className="p-2.5 space-y-1.5 group">
         {/* Title row */}
         <div className="flex items-center gap-1.5">
           <button
