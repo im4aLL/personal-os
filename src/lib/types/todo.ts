@@ -9,6 +9,7 @@ export interface Todo {
   priority: TodoPriority | null
   due_date: string | null      // ISO date string e.g. "2026-07-15"
   position: number
+  archived: boolean
   created_at: string           // ISO datetime string
   updated_at: string           // ISO datetime string
 }

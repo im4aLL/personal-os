@@ -4,6 +4,7 @@ import "./App.css"
 import { getTursoConfig, getAppMode } from "#lib/config"
 import { getProfile } from "#lib/profile"
 import { Layout }         from "#components/layout"
+import { Toaster }        from "#components/ui/sonner"
 import SetupPage          from "#pages/setup"
 import DashboardPage      from "#pages/dashboard"
 import LinksPage          from "#pages/links"
@@ -47,5 +48,10 @@ const router = createHashRouter([
 ])
 
 export default function App() {
-  return <RouterProvider router={router} />
+  return (
+    <>
+      <RouterProvider router={router} />
+      <Toaster />
+    </>
+  )
 }

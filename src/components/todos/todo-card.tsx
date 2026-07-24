@@ -1,5 +1,5 @@
 import { useDraggable } from "@dnd-kit/core"
-import { Calendar, GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { Calendar, ClipboardList, GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 
 import { Badge } from "#components/ui/badge"
 import { Button } from "#components/ui/button"
@@ -36,10 +36,11 @@ interface TodoCardProps {
   todo: Todo
   onEdit: (todo: Todo) => void
   onDelete: (id: string) => void
+  onAddWorkLog?: (todo: Todo) => void
   isOverlay?: boolean
 }
 
-export function TodoCard({ todo, onEdit, onDelete, isOverlay }: TodoCardProps) {
+export function TodoCard({ todo, onEdit, onDelete, onAddWorkLog, isOverlay }: TodoCardProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: todo.id,
     disabled: isOverlay,
@@ -89,6 +90,12 @@ export function TodoCard({ todo, onEdit, onDelete, isOverlay }: TodoCardProps) {
                   <Pencil />
                   Edit
                 </DropdownMenuItem>
+                {todo.status === "completed" && onAddWorkLog && (
+                  <DropdownMenuItem onSelect={() => onAddWorkLog(todo)}>
+                    <ClipboardList />
+                    Add as work log
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onSelect={() => onDelete(todo.id)}

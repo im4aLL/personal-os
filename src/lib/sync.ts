@@ -78,17 +78,17 @@ export async function syncTodos(options: { silent?: boolean } = {}): Promise<voi
     if (!local) {
       await db.execute(
         `INSERT OR IGNORE INTO todos
-           (id,title,description,status,priority,due_date,position,created_at,updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+           (id,title,description,status,priority,due_date,position,archived,created_at,updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [remote.id, remote.title, remote.description, remote.status,
-         remote.priority, remote.due_date, remote.position, remote.created_at, remote.updated_at]
+         remote.priority, remote.due_date, remote.position, remote.archived, remote.created_at, remote.updated_at]
       )
     } else if (remote.updated_at > local.updated_at) {
       await db.execute(
         `UPDATE todos SET title=$1,description=$2,status=$3,priority=$4,
-         due_date=$5,position=$6,updated_at=$7 WHERE id=$8`,
+         due_date=$5,position=$6,archived=$7,updated_at=$8 WHERE id=$9`,
         [remote.title, remote.description, remote.status, remote.priority,
-         remote.due_date, remote.position, remote.updated_at, remote.id]
+         remote.due_date, remote.position, remote.archived, remote.updated_at, remote.id]
       )
     }
   }
@@ -99,17 +99,17 @@ export async function syncTodos(options: { silent?: boolean } = {}): Promise<voi
     if (!remote) {
       await tursoExecute(
         `INSERT OR IGNORE INTO todos
-           (id,title,description,status,priority,due_date,position,created_at,updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?)`,
+           (id,title,description,status,priority,due_date,position,archived,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
         [local.id, local.title, local.description, local.status,
-         local.priority, local.due_date, local.position, local.created_at, local.updated_at]
+         local.priority, local.due_date, local.position, local.archived, local.created_at, local.updated_at]
       )
     } else if (local.updated_at > remote.updated_at) {
       await tursoExecute(
         `UPDATE todos SET title=?,description=?,status=?,priority=?,
-         due_date=?,position=?,updated_at=? WHERE id=?`,
+         due_date=?,position=?,archived=?,updated_at=? WHERE id=?`,
         [local.title, local.description, local.status, local.priority,
-         local.due_date, local.position, local.updated_at, local.id]
+         local.due_date, local.position, local.archived, local.updated_at, local.id]
       )
     }
   }

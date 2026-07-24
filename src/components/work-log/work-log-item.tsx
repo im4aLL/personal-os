@@ -1,7 +1,18 @@
+import { useState } from "react"
 import { Pencil, Trash2 } from "lucide-react"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "#components/ui/alert-dialog"
 import { Badge } from "#components/ui/badge"
-import { Button } from "#components/ui/button"
+import { Button, buttonVariants } from "#components/ui/button"
 import { cn } from "#lib/utils"
 import { deleteWorkLog } from "#lib/work-logs"
 import { useWorkLogsStore } from "#store/work-logs"
@@ -26,8 +37,10 @@ interface WorkLogItemProps {
 
 export function WorkLogItem({ log, onEdit }: WorkLogItemProps) {
   const { removeWorkLog } = useWorkLogsStore.getState()
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   async function handleDelete() {
+    setDeleteConfirmOpen(false)
     removeWorkLog(log.id)
     await deleteWorkLog(log.id)
   }
@@ -49,7 +62,7 @@ export function WorkLogItem({ log, onEdit }: WorkLogItemProps) {
         <p className="text-sm font-medium leading-snug">{log.title}</p>
 
         {log.description && (
-          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2 break-all">
             {log.description}
           </p>
         )}
@@ -74,11 +87,31 @@ export function WorkLogItem({ log, onEdit }: WorkLogItemProps) {
           variant="ghost"
           size="icon-sm"
           className="text-muted-foreground hover:text-destructive"
-          onClick={handleDelete}
+          onClick={() => setDeleteConfirmOpen(true)}
         >
           <Trash2 className="size-3.5" />
         </Button>
       </div>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete work log entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete "{log.title}". This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
+              onClick={handleDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

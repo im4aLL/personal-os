@@ -117,7 +117,7 @@ export function WorkLogDialog({ open, onOpenChange, log }: WorkLogDialogProps) {
             </Label>
             <Textarea
               placeholder="Add more details…"
-              className="resize-none"
+              className="resize-none break-all"
               rows={3}
               value={description}
               onChange={e => setDescription(e.target.value)}

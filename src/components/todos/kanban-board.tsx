@@ -10,14 +10,29 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core"
-import { Search } from "lucide-react"
+import { Archive, Search } from "lucide-react"
+import { toast } from "sonner"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "#components/ui/alert-dialog"
+import { Button, buttonVariants } from "#components/ui/button"
 import { Input } from "#components/ui/input"
 import { Skeleton } from "#components/ui/skeleton"
 import { cn } from "#lib/utils"
-import { createTodo, updateTodo, deleteTodo } from "#lib/todos"
+import { createTodo, updateTodo, deleteTodo, deleteTodos, archiveTodos } from "#lib/todos"
 import type { Todo, TodoStatus } from "#lib/types/todo"
+import { createWorkLog } from "#lib/work-logs"
 import { useTodosStore } from "#store/todos"
+import { useWorkLogsStore } from "#store/work-logs"
+import { ArchivedTodosDialog } from "./archived-todos-dialog"
 import { KanbanColumn } from "./kanban-column"
 import { TodoCard } from "./todo-card"
 import { TodoDialog, type TodoFormValues } from "./todo-dialog"
@@ -27,13 +42,15 @@ const COLUMNS: TodoStatus[] = ["todo", "in_progress", "completed"]
 export function KanbanBoard() {
   const todos   = useTodosStore(s => s.todos)
   const loading = useTodosStore(s => s.loading)
-  const { loadTodos, addTodo, patchTodo, removeTodo } = useTodosStore.getState()
+  const { loadTodos, addTodo, patchTodo, removeTodo, removeTodos } = useTodosStore.getState()
 
   const [search,        setSearch]        = useState("")
   const [activeId,      setActiveId]      = useState<string | null>(null)
   const [dialogOpen,    setDialogOpen]    = useState(false)
   const [editingTodo,   setEditingTodo]   = useState<Todo | null>(null)
   const [defaultStatus, setDefaultStatus] = useState<TodoStatus>("todo")
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [archivedOpen, setArchivedOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -141,6 +158,49 @@ export function KanbanBoard() {
     }
   }
 
+  async function handleAddWorkLog(todo: Todo) {
+    const today = new Date().toISOString().split("T")[0]
+    try {
+      const created = await createWorkLog({
+        title:       todo.title,
+        description: todo.description,
+        start_date:  today,
+        end_date:    today,
+        tags:        [],
+      })
+      useWorkLogsStore.getState().addWorkLog(created)
+      toast.success("Added to work log")
+    } catch (err) {
+      console.error("Failed to create work log from todo:", err)
+      toast.error("Failed to add work log")
+    }
+  }
+
+  async function handleArchiveCompleted() {
+    const ids = byStatus.completed.map(t => t.id)
+    if (!ids.length) return
+    removeTodos(ids)
+    try {
+      await archiveTodos(ids)
+    } catch (err) {
+      console.error("Failed to archive completed todos:", err)
+      loadTodos() // revert on failure
+    }
+  }
+
+  async function handleClearCompleted() {
+    const ids = byStatus.completed.map(t => t.id)
+    setClearConfirmOpen(false)
+    if (!ids.length) return
+    removeTodos(ids)
+    try {
+      await deleteTodos(ids)
+    } catch (err) {
+      console.error("Failed to clear completed todos:", err)
+      loadTodos() // revert on failure
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -159,14 +219,25 @@ export function KanbanBoard() {
   return (
     <div className={cn("flex flex-col gap-4 h-full")}>
       {/* Search bar */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-        <Input
-          className="pl-8 h-8 text-sm"
-          placeholder="Search todos..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+      <div className="flex items-center gap-2">
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            className="pl-8 h-8 text-sm"
+            placeholder="Search todos..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-muted-foreground hover:text-foreground"
+          onClick={() => setArchivedOpen(true)}
+        >
+          <Archive className="size-3.5" />
+          Archived
+        </Button>
       </div>
 
       {/* Kanban columns */}
@@ -177,7 +248,7 @@ export function KanbanBoard() {
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveId(null)}
       >
-        <div className="flex gap-4 flex-1 overflow-x-auto pb-2">
+        <div className="flex gap-4 flex-1 min-h-0 overflow-x-auto pb-2">
           {COLUMNS.map(status => (
             <KanbanColumn
               key={status}
@@ -186,6 +257,9 @@ export function KanbanBoard() {
               onAdd={() => openCreate(status)}
               onEdit={openEdit}
               onDelete={handleDelete}
+              onAddWorkLog={handleAddWorkLog}
+              onArchiveCompleted={handleArchiveCompleted}
+              onClearCompleted={() => setClearConfirmOpen(true)}
             />
           ))}
         </div>
@@ -210,6 +284,31 @@ export function KanbanBoard() {
         defaultStatus={defaultStatus}
         onSave={handleSave}
       />
+
+      {/* Clear completed confirmation */}
+      <AlertDialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear completed todos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {byStatus.completed.length} completed{" "}
+              {byStatus.completed.length === 1 ? "todo" : "todos"}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
+              onClick={handleClearCompleted}
+            >
+              Clear all
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Archived todos */}
+      <ArchivedTodosDialog open={archivedOpen} onOpenChange={setArchivedOpen} />
     </div>
   )
 }

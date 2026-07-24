@@ -10,8 +10,10 @@ interface TodosStore {
   refreshTodos: () => Promise<void>
   setTodos:     (todos: Todo[]) => void
   addTodo:      (todo: Todo)    => void
+  addTodos:     (todos: Todo[]) => void
   patchTodo:    (id: string, patch: Partial<Todo>) => void
   removeTodo:   (id: string)   => void
+  removeTodos:  (ids: string[]) => void
 }
 
 export const useTodosStore = create<TodosStore>((set) => ({
@@ -42,6 +44,8 @@ export const useTodosStore = create<TodosStore>((set) => ({
 
   setTodos:   (todos)          => set({ todos }),
   addTodo:    (todo)           => set(s => ({ todos: [...s.todos, todo] })),
+  addTodos:   (todos)          => set(s => ({ todos: [...s.todos, ...todos] })),
   patchTodo:  (id, patch)      => set(s => ({ todos: s.todos.map(t => t.id === id ? { ...t, ...patch } : t) })),
   removeTodo: (id)             => set(s => ({ todos: s.todos.filter(t => t.id !== id) })),
+  removeTodos: (ids)           => set(s => { const idSet = new Set(ids); return { todos: s.todos.filter(t => !idSet.has(t.id)) } }),
 }))

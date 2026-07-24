@@ -11,6 +11,7 @@ export const REMOTE_SCHEMAS = [
     priority    TEXT,
     due_date    TEXT,
     position    INTEGER NOT NULL DEFAULT 0,
+    archived    INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL,
     CONSTRAINT chk_status   CHECK (status   IN ('todo','in_progress','completed')),
@@ -113,6 +114,7 @@ export const REMOTE_SCHEMAS = [
   // Additive migration for existing remote tables — ensureRemoteSchema ignores
   // the "duplicate column" error when the column already exists.
   `ALTER TABLE work_items ADD COLUMN jira_ticket TEXT`,
+  `ALTER TABLE todos ADD COLUMN archived INTEGER NOT NULL DEFAULT 0`,
 ]
 
 // Applies every remote schema statement, tolerating "duplicate column" errors
